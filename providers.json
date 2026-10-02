@@ -1,36 +1,50 @@
-{
-  "_comment": [
-    "Provider configuration. Secrets are NOT here: a provider that needs a key",
-    "names an environment variable in api_key_env, and the key is read from the",
-    "environment as TEAHUB_KEY_<NAME>. A config file that can be committed is a",
-    "config file that eventually is.",
-    "",
-    "Add a model whenever a provider reports one. An omitted capability means",
-    "false. An omitted cost means unknown, which is reported as null and never",
-    "rendered as zero."
-  ],
-  "providers": [
-    {
-      "name": "ollama",
-      "base_url": "http://127.0.0.1:11434/v1",
-      "capabilities": { "chat": true },
-      "models": [
-        { "id": "llama3.1:8b", "context_window": 128000 }
-      ]
-    },
-    {
-      "name": "openrouter",
-      "base_url": "https://openrouter.ai/api/v1",
-      "api_key_env": "TEAHUB_KEY_OPENROUTER",
-      "models": [
-        {
-          "id": "some/free-model",
-          "context_window": 32768,
-          "capabilities": { "chat": true, "tools": true },
-          "cost_per_1k_input": 0.0,
-          "cost_per_1k_output": 0.0
-        }
-      ]
-    }
-  ]
+﻿{
+    "_comment":  [
+                     "Provider configuration. Secrets are NOT here: a provider that needs a key",
+                     "names an environment variable in api_key_env, and the key is read from the",
+                     "environment as TEAHUB_KEY_\u003cNAME\u003e. A config file that can be committed is a",
+                     "config file that eventually is.",
+                     "",
+                     "Add a model whenever a provider reports one. An omitted capability means",
+                     "false. An omitted cost means unknown, which is reported as null and never",
+                     "rendered as zero."
+                 ],
+    "providers":  [
+                      {
+                          "kind":  "mlhsm",
+                          "name":  "mlhsm",
+                          "base_url":  "http://127.0.0.1:19090",
+                          "api_key_env":  "TEAHUB_MLHSM_TOKEN"
+                      },
+                      {
+                          "name":  "ollama",
+                          "base_url":  "http://127.0.0.1:11434/v1",
+                          "capabilities":  {
+                                               "chat":  true
+                                           },
+                          "models":  [
+                                         {
+                                             "id":  "llama3.1:8b",
+                                             "context_window":  128000
+                                         }
+                                     ]
+                      },
+                      {
+                          "name":  "openrouter",
+                          "base_url":  "https://openrouter.ai/api/v1",
+                          "api_key_env":  "TEAHUB_KEY_OPENROUTER",
+                          "models":  [
+                                         {
+                                             "id":  "some/free-model",
+                                             "context_window":  32768,
+                                             "capabilities":  {
+                                                                  "chat":  true,
+                                                                  "tools":  true
+                                                              },
+                                             "cost_per_1k_input":  0.0,
+                                             "cost_per_1k_output":  0.0
+                                         }
+                                     ]
+                      }
+                  ]
 }

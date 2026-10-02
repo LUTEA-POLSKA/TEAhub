@@ -473,12 +473,11 @@ fn satisfied_globally(
 
 /// Parse a manifest, tolerating a UTF-8 byte-order mark.
 ///
-/// PowerShell's `Out-File -Encoding utf8` and several Windows editors write one,
-/// and serde_json rejects it outright. The file is valid JSON; refusing it would
-/// report a confusing parse error for a document that reads correctly in any
-/// editor, so the mark is stripped rather than treated as corruption.
+/// See [`crate::strip_bom`]. The rule lives in one place so a second loader
+/// cannot forget it, which is exactly what happened when the config loader was
+/// added without it.
 fn parse_manifest(raw: &str) -> Result<Manifest, serde_json::Error> {
-    serde_json::from_str(raw.strip_prefix('\u{feff}').unwrap_or(raw))
+    serde_json::from_str(crate::strip_bom(raw))
 }
 
 /// Two capabilities claiming one id is a refusal, not a merge.

@@ -585,10 +585,29 @@ trait ModelClient {
 
 Two implementations:
 
-1. **`MlhsmModelClient`** — `POST /api/v1/modelmesh/chat` (+ `/models`, `/usage`). Primary. Provider keys, discovery, routing, and cost accounting stay in MLHSM where they already live.
-2. **`DirectProviderClient`** — for providers MLHSM does not carry. Pluggable, same interface.
+Both implementations are now built.
 
-This satisfies "a new provider appears → integrate without modifying agents": it becomes a `DirectProviderClient` behind the `ModelClient` trait, and no agent code changes.
+1. **`MlhsmModelClient`** (`src/model/mlhsm.rs`) — `POST /api/v1/modelmesh/chat`
+   (+ `/models`). Primary. Provider keys, discovery, routing and cost accounting
+   stay in MLHSM where they already live. **The token arrives via
+   `TEAHUB_MLHSM_TOKEN`; until it exists the provider is skipped with a named
+   reason rather than appearing broken.**
+2. **`OpenAiCompatible`** (`src/model/openai.rs`) — for providers MLHSM does not
+   carry. `/v1/chat/completions`, which Ollama, LM Studio, vLLM, OpenRouter,
+   Groq and OpenAI all speak.
+
+Two details of the live API that a guess would have got wrong, both read from
+the host source:
+
+* `/chat` selects a model by `name` or `display_name`, **never by the internal
+  `id`** (`routing.rs:151-155`), so the wire name is what travels.
+* A failed completion is a **non-200 status with a plain-text body**, not a JSON
+  envelope. The host deliberately rejected `200` plus `{"error": ...}` because
+  that is indistinguishable from a real answer (`modelmesh.rs:339-340`). The
+  client matches that and preserves the reason.
+
+This satisfies "a new provider appears → integrate without modifying agents": it
+becomes another `ModelClient` behind the same trait, and no agent code changes.
 
 Capability matching (`reasoning`, `tools`, `context`, `vision`, `structured_output`) is expressed as a **requirement object**, not a model name. The concrete resolution is MLHSM's JEV + deterministic fallback. If MLHSM is unreachable, TEAhub degrades to explicit-model selection and says so in the evidence record — it does not silently pretend a preference was honoured.
 

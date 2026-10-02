@@ -6,6 +6,7 @@
 
 pub mod capability;
 pub mod mesh;
+pub mod mlhsm;
 pub mod openai;
 
 use serde::{Deserialize, Serialize};

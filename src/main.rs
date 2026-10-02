@@ -1,10 +1,11 @@
-//! The TEAhub module process.
+﻿//! The TEAhub module process.
 //!
 //! Binds loopback, answers `/health`, and serves the capability registry under
 //! `/api/v1/teahub`. The port comes from `MLHSM_MODULE_PORT` when a host
 //! injected one, so the same binary runs standalone and as an MLHSM external
 //! module without a build difference.
 
+use std::io::Write;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -37,14 +38,14 @@ async fn main() {
         .unwrap_or_else(|| PathBuf::from("."));
 
     let (mesh, notes) = match Config::load(&data_dir) {
-        Ok(config) => config.mesh(),
+        Ok(config) => config.mesh().await,
         Err(e) => {
-            eprintln!("teahub: no usable provider config ({e})");
+            let _ = writeln!(std::io::stderr(), "teahub: no usable provider config ({e})");
             (Mesh::new(vec![]), vec![e.to_string()])
         }
     };
     for note in &notes {
-        eprintln!("teahub: {note}");
+        let _ = writeln!(std::io::stderr(), "teahub: {note}");
     }
 
     let app_state = Arc::new(App {
@@ -70,18 +71,22 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("teahub: cannot bind {addr}: {e}");
+            let _ = writeln!(std::io::stderr(), "teahub: cannot bind {addr}: {e}");
             std::process::exit(1);
         }
     };
 
-    println!("teahub: listening on http://{addr}");
+    // Never `println!` on this path. The printing macros panic when the stream
+    // is closed, and a service that dies because its banner could not be
+    // written is reported by a supervisor as a failed start â€” a logging
+    // failure masquerading as a startup failure.
+    let _ = writeln!(std::io::stderr(), "teahub: listening on http://{addr}");
 
     if let Err(e) = axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await
     {
-        eprintln!("teahub: server failed: {e}");
+        let _ = writeln!(std::io::stderr(), "teahub: server failed: {e}");
         std::process::exit(1);
     }
 }
