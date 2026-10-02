@@ -5,6 +5,9 @@
 //! HTTP, so it stays testable and the host stays replaceable.
 
 pub mod capability;
+pub mod config;
+pub mod model;
 pub mod registry;
 
+pub use model::{ChatRequest, ChatResponse, Mesh, ModelClient, ModelError, Requirement};
 pub use registry::{Entry, NotRunnable, Registry};
