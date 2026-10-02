@@ -1,0 +1,27 @@
+[package]
+name = "teahub"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "Private, embedded-first AI capability platform. Runs as an MLHSM external module."
+license = "MIT"
+
+[lib]
+name = "teahub"
+path = "src/lib.rs"
+
+[[bin]]
+name = "teahub"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+semver = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

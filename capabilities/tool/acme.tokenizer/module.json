@@ -1,0 +1,14 @@
+{
+  "api_version": "teahub.dev/v0.1",
+  "id": "acme.tokenizer",
+  "name": "Acme Tokenizer",
+  "version": "0.1.0",
+  "kind": "tool",
+  "description": "Splits text into tokens.",
+  "provides": [{ "capability": "text.tokenize", "version": 1 }],
+  "runtime": { "kind": "native", "entry": "tokenizer.exe" },
+  "permissions": [{ "kind": "proc.spawn" }],
+  "limits": { "timeout_ms": 10000, "memory_mb": 128, "egress_calls_per_run": 0 },
+  "provenance": { "source": "local", "author": "acme", "license": "MIT" },
+  "trust": "local"
+}

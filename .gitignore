@@ -1,0 +1,6 @@
+/target
+
+# Local registry state: which capabilities this machine approved and the digest
+# each was pinned to. Machine-specific, never shared — the pin is what makes an
+# approved payload tamper-evident, so it must not be inherited from another box.
+capabilities/state.json

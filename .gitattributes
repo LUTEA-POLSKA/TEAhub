@@ -1,0 +1,10 @@
+# Text is stored with LF and checked out with LF.
+#
+# Without this, a Windows checkout rewrites LF to CRLF, which silently invalidates
+# every pinned capability digest the moment a manifest is touched: the bytes
+# change, the pin no longer matches, and the capability stops being runnable.
+* text=auto eol=lf
+
+*.exe binary
+*.png binary
+*.ico binary

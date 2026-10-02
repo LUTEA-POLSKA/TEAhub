@@ -1,0 +1,15 @@
+﻿{
+  "api_version": "teahub.dev/v0.1",
+  "id": "acme.reviewer",
+  "name": "Acme Reviewer",
+  "version": "0.1.0",
+  "kind": "agent",
+  "description": "Reviews text against a rubric.",
+  "provides": [{ "capability": "text.review", "version": 1 }],
+  "requires": [{ "capability": "text.tokenize" }],
+  "runtime": { "kind": "native", "entry": "reviewer.exe" },
+  "permissions": [{ "kind": "fs.read", "resource": "data/teahub" }],
+  "limits": { "timeout_ms": 30000, "memory_mb": 256, "egress_calls_per_run": 0 },
+  "provenance": { "source": "local", "author": "acme", "license": "MIT" },
+  "trust": "local"
+}
