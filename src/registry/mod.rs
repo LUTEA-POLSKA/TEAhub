@@ -326,10 +326,12 @@ impl Registry {
         let Ok(raw) = std::fs::read_to_string(self.state_path()) else {
             return BTreeMap::new();
         };
-        if let Ok(current) = serde_json::from_str::<BTreeMap<String, CapabilityState>>(&raw) {
+        if let Ok(current) = crate::parse_json::<BTreeMap<String, CapabilityState>>(&raw) {
             return current;
         }
-        serde_json::from_str::<BTreeMap<String, bool>>(&raw)
+        // The older format was a bare `id -> enabled` map, still read so an
+        // upgrade does not silently forget every approval.
+        crate::parse_json::<BTreeMap<String, bool>>(&raw)
             .map(|legacy| {
                 legacy
                     .into_iter()
@@ -471,13 +473,13 @@ fn satisfied_globally(
         .any(|e| e.provides.iter().any(|p| p == capability) && satisfied.contains(&e.id))
 }
 
-/// Parse a manifest, tolerating a UTF-8 byte-order mark.
+/// Parse a manifest through the shared JSON entry point.
 ///
-/// See [`crate::strip_bom`]. The rule lives in one place so a second loader
-/// cannot forget it, which is exactly what happened when the config loader was
-/// added without it.
+/// See [`crate::parse_json`]. The rule lives in one place so a second loader
+/// cannot forget it, which is exactly what happened when the config loader and
+/// the permissions view were added without it.
 fn parse_manifest(raw: &str) -> Result<Manifest, serde_json::Error> {
-    serde_json::from_str(crate::strip_bom(raw))
+    crate::parse_json(raw)
 }
 
 /// Two capabilities claiming one id is a refusal, not a merge.

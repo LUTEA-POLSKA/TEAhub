@@ -101,14 +101,14 @@ impl Config {
             path: path.display().to_string(),
             source: e,
         })?;
-        serde_json::from_str(crate::strip_bom(&raw)).map_err(|e| ConfigError::Parse {
+        crate::parse_json(&raw).map_err(|e| ConfigError::Parse {
             path: path.display().to_string(),
             source: e,
         })
     }
 
     pub fn from_json(raw: &str) -> Result<Self, ConfigError> {
-        serde_json::from_str(crate::strip_bom(raw)).map_err(|e| ConfigError::Parse {
+        crate::parse_json(raw).map_err(|e| ConfigError::Parse {
             path: CONFIG_FILE.into(),
             source: e,
         })

@@ -1,0 +1,39 @@
+{
+  "_comment": [
+    "Operator-owned policy. A capability can read its manifest but never this",
+    "file, because a capability that can edit its own permissions is not a",
+    "permission system.",
+    "",
+    "Three lists per tier, and the most restrictive statement wins: deny beats",
+    "require_human beats allow. A permission matched by none of them is DENIED.",
+    "",
+    "Patterns are kind:resource. `*` is one path segment, `**` spans segments,",
+    "and a kind with no resource is written without a colon, e.g. proc.spawn.",
+    "",
+    "default_tier applies to any manifest that declares no trust of its own."
+  ],
+  "default_tier": "third_party",
+  "tiers": {
+    "builtin": {
+      "allow": [
+        "fs.read:data/**",
+        "fs.write:data/**",
+        "net.egress:**",
+        "secret.use:**"
+      ]
+    },
+    "local": {
+      "allow": ["fs.read:data/**", "net.egress:**"],
+      "require_human": ["fs.write:data/**", "secret.use:**"]
+    },
+    "third_party": {
+      "allow": ["fs.read:data/**"],
+      "require_human": ["fs.write:data/**", "net.egress:**", "secret.use:**"]
+    },
+    "untrusted": {
+      "allow": ["fs.read:modules/**"],
+      "require_human": [],
+      "deny": ["proc.spawn", "fs.write:**", "net.egress:**", "secret.use:**"]
+    }
+  }
+}

@@ -23,6 +23,8 @@ struct App {
     registry: Registry,
     mesh: Mesh,
     notes: Vec<String>,
+    policy: teahub::policy::Policy,
+    policy_loaded: bool,
     port: u16,
     data_dir: PathBuf,
 }
@@ -48,7 +50,20 @@ async fn main() {
         let _ = writeln!(std::io::stderr(), "teahub: {note}");
     }
 
+    let (policy, policy_loaded) = match teahub::policy::Policy::load(&data_dir) {
+        Ok(p) => (p, true),
+        Err(e) => {
+            let _ = writeln!(
+                std::io::stderr(),
+                "teahub: no usable policy ({e}); denying everything"
+            );
+            (teahub::policy::Policy::deny_all(), false)
+        }
+    };
+
     let app_state = Arc::new(App {
+        policy,
+        policy_loaded,
         registry: Registry::open(root),
         mesh,
         notes,
@@ -61,6 +76,7 @@ async fn main() {
         .route("/api/v1/teahub/health", get(health))
         .route("/api/v1/teahub/registry", get(registry_view))
         .route("/api/v1/teahub/models", get(models_view))
+        .route("/api/v1/teahub/permissions", get(permissions_view))
         .route("/api/v1/teahub/resolve", post(resolve_view))
         .route("/api/v1/teahub/chat", post(chat))
         .route("/api/v1/teahub/registry/enable/{id}", post(enable))
@@ -228,6 +244,55 @@ async fn chat(
             Json(serde_json::json!({ "error": e.to_string() })),
         )),
     }
+}
+
+/// What each capability asked for versus what it was actually granted.
+///
+/// The gap between the two columns is the whole point of the policy engine, so
+/// it is rendered rather than summarised.
+async fn permissions_view(State(app): State<Arc<App>>) -> Json<serde_json::Value> {
+    let entries = app.registry.scan();
+    let mut out = Vec::new();
+
+    for entry in entries {
+        let manifest = std::fs::read_to_string(std::path::Path::new(&entry.path).join("module.json"))
+            .ok()
+            .and_then(|raw| teahub::parse_json::<teahub::capability::Manifest>(&raw).ok());
+
+        let Some(manifest) = manifest else {
+            continue;
+        };
+        let tier = teahub::policy::TrustTier::from_claimed(
+            manifest.trust,
+        );
+        let tier = teahub::policy::tier_for(&manifest, tier);
+        let decision = teahub::policy::decide(&manifest, tier, &app.policy);
+
+        out.push(serde_json::json!({
+            "id": entry.id,
+            "tier": tier.as_str(),
+            "granted": decision.granted.iter().map(|p| format!(
+                "{}:{}", p.kind.as_str(), p.resource.as_deref().unwrap_or("*")
+            )).collect::<Vec<_>>(),
+            "pending_human": decision.pending().iter().map(|j| format!(
+                "{}:{}", j.permission.kind.as_str(),
+                j.permission.resource.as_deref().unwrap_or("*")
+            )).collect::<Vec<_>>(),
+            "judgements": decision.judgements.iter().map(|j| serde_json::json!({
+                "permission": format!("{}:{}", j.permission.kind.as_str(),
+                    j.permission.resource.as_deref().unwrap_or("*")),
+                "verdict": j.verdict,
+                "rule": j.rule,
+                "reason": j.reason,
+            })).collect::<Vec<_>>(),
+        }));
+    }
+
+    Json(serde_json::json!({
+        "default_tier": app.policy.default_tier.as_str(),
+        "policy_loaded": app.policy_loaded,
+        "capabilities": out,
+    }))
 }
 
 async fn enable(State(app): State<Arc<App>>, axum::extract::Path(id): axum::extract::Path<String>) -> impl axum::response::IntoResponse {
