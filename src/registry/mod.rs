@@ -29,6 +29,7 @@ pub enum NotRunnable {
     BadJson(String),
     Rejected(ValidationError),
     MissingRequirement(String),
+    DuplicateId(String),
     PinnedDigestChanged { expected: String, actual: String },
     DependencyCycle(Vec<String>),
 }
@@ -42,6 +43,9 @@ impl std::fmt::Display for NotRunnable {
             NotRunnable::Rejected(e) => write!(f, "rejected: {e}"),
             NotRunnable::MissingRequirement(c) => {
                 write!(f, "requires capability {c:?}, which no installed capability provides")
+            }
+            NotRunnable::DuplicateId(id) => {
+                write!(f, "id {id:?} is claimed by more than one installed capability")
             }
             NotRunnable::PinnedDigestChanged { expected, actual } => {
                 write!(f, "payload changed since it was pinned: expected {expected}, found {actual}")
@@ -129,7 +133,7 @@ impl Registry {
             }
         }
         out.sort_by(|a, b| (a.kind.clone(), a.id.clone()).cmp(&(b.kind.clone(), b.id.clone())));
-        out
+        mark_duplicate_ids(out)
     }
 
     fn inspect(
@@ -477,6 +481,35 @@ fn parse_manifest(raw: &str) -> Result<Manifest, serde_json::Error> {
     serde_json::from_str(raw.strip_prefix('\u{feff}').unwrap_or(raw))
 }
 
+/// Two capabilities claiming one id is a refusal, not a merge.
+///
+/// Both are left in the catalog with their full description — hiding either
+/// would make a duplicate look like an absence — but neither is runnable,
+/// because which one the operator meant is a question only they can answer.
+fn mark_duplicate_ids(entries: Vec<Entry>) -> Vec<Entry> {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for entry in &entries {
+        *counts.entry(entry.id.clone()).or_default() += 1;
+    }
+    let duplicated: BTreeSet<String> = counts
+        .into_iter()
+        .filter(|(_, seen)| *seen > 1)
+        .map(|(id, _)| id)
+        .collect();
+
+    entries
+        .into_iter()
+        .map(|mut entry| {
+            if duplicated.contains(&entry.id) {
+                entry.runnable = false;
+                entry.enabled = false;
+                entry.problem = Some(NotRunnable::DuplicateId(entry.id.clone()).to_string());
+            }
+            entry
+        })
+        .collect()
+}
+
 fn entry_skeleton(
     id: &str,
     path: &Path,
@@ -630,6 +663,33 @@ mod tests {
     fn an_empty_root_scans_to_nothing() {
         let (_d, root) = root("empty");
         assert!(Registry::open(&root).scan().is_empty());
+    }
+
+    #[test]
+    fn two_capabilities_claiming_one_id_are_both_refused() {
+        let (_d, root) = root("dup-id");
+        write_capability(&root, "tool", "acme.tool", "");
+        let clash = root.join("agent/acme.tool");
+        fs::create_dir_all(&clash).expect("mkdir");
+        fs::write(clash.join("entry.exe"), b"binary").expect("entry");
+        fs::write(
+            clash.join(MANIFEST_FILE),
+            r#"{"api_version":"teahub.dev/v0.1","id":"acme.tool","name":"Other","version":"0.1.0",
+                "kind":"agent","description":"d","runtime":{"kind":"native","entry":"entry.exe"},
+                "provenance":{"source":"local"}}"#,
+        )
+        .expect("manifest");
+
+        let entries = Registry::open(&root).scan();
+        let clashing: Vec<&Entry> = entries.iter().filter(|e| e.id == "acme.tool").collect();
+        assert_eq!(clashing.len(), 2, "both must stay visible in the catalog");
+        assert!(
+            clashing.iter().all(|e| !e.runnable && !e.enabled),
+            "a duplicate id makes both unrunnable: {clashing:?}"
+        );
+        assert!(clashing
+            .iter()
+            .all(|e| e.problem.as_ref().unwrap().contains("claimed by more than one")));
     }
 
     #[test]

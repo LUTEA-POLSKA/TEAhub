@@ -448,11 +448,11 @@ Given F3, TEAhub's decision layer is **not** OpenJEV. Define it locally as:
 Deliberately minimal. Only fields that are actually enforced.
 
 ```yaml
-apiVersion: teahub.dev/v0.1
+api_version: teahub.dev/v0.1
 id: acme.reviewer              # reverse-DNS-ish, globally unique
 name: "Acme Reviewer"
 version: 0.1.0                # semver, required
-type: agent | skill | tool | mcp | workflow | connector
+kind: agent | skill | tool | mcp | workflow | connector
 description: "One line, used for selection."
 
 provides:                     # typed capabilities this exposes
@@ -460,24 +460,25 @@ provides:                     # typed capabilities this exposes
     version: 1
 
 requires:                     # capabilities that must exist
-  - capability: fs.read
+  - capability: text.tokenize
+    optional: false
 
 # Runtime — only these three are supported in v0.1. Adding a runtime is a
 # breaking change, which is the point: it forces a decision.
 runtime:
   kind: native | stdio | http
-  entry: ./run.sh              # or cmd: for stdio, url: for http
+  entry: ./reviewer.exe         # or command: for stdio, url: for http
 
 permissions:                  # requested, NOT granted. Policy decides.
-  - fs.read:data/teahub
-  - net.egress:api.acme.com
-  - proc.spawn:none
-  - secret.use:acme_api_key
+  - kind: fs.read
+    resource: data/teahub
+  - kind: proc.spawn
+    # proc.spawn and secret.use need no resource
 
 limits:                       # ceilings, enforced by the runtime
-  timeoutMs: 60000
-  memoryMb: 512
-  egressCallsPerRun: 50
+  timeout_ms: 60000
+  memory_mb: 512
+  egress_calls_per_run: 50
 
 provenance:                   # required for anything not built-in
   source: builtin | local | registry:<id> | git:<url>@<sha>
@@ -485,10 +486,23 @@ provenance:                   # required for anything not built-in
   license: "..."
   digest: "sha256:..."        # content hash of the payload
 
-trust: builtin | local | third_party | untrusted   # set by policy, not author
-health:
-  kind: self                  # module reports its own status line
+trust: builtin | local | third_party | untrusted   # advisory; policy may only lower it
 ```
+
+**Renamed from the first draft of this spec, because the code is right and the
+spec was not:**
+
+- `manifest.yaml` → **`module.json`**, matching MLHSM's `data/modules/<id>/module.json`.
+  TEAhub is installed as an MLHSM external module, so its capability layout has
+  to be the layout MLHSM already scans.
+- `apiVersion`/`type` → **`api_version`/`kind`**, matching `runtime.kind` in the
+  same document rather than mixing conventions.
+- `permissions` as a flat `fs.read:path` list → **an object with `kind` and
+  `resource`**, so a missing resource is a validation error instead of a string
+  that happens to lack a colon.
+
+**`health` was dropped.** It only earns its place once something executes; a
+status line for a capability that cannot run is decoration.
 
 **Explicitly excluded from v0.1:** signature blocks, dependency version ranges, resource requests, lifecycle scripts, compatibility matrices, multi-artefact payloads. Each is a field that looks useful and enforces nothing. Add them when there is a demonstrated need — the registry's `digest` + `trust` already covers the realistic threat model for a private, single-operator system.
 
@@ -496,19 +510,29 @@ health:
 
 | Stage | v0.1 behaviour |
 |---|---|
-| Discovery | Filesystem scan of `capabilities/<type>/<id>/manifest.yaml`. No remote registry in v0.1. |
-| Validation | Schema check; `id` uniqueness; `runtime.entry` exists and is executable; `digest` matches payload. **Refuse on any failure — do not drop-and-continue.** |
-| Dependency resolution | Topological order over `requires`; missing requirement = hard error, never a warning. |
-| Compatibility | `apiVersion` major must match. |
-| Trust | Assigned by policy from `provenance` + `trust` requested. Author-declared trust is **advisory only**. |
-| Provenance | `digest` recorded on enable; re-verified on every start. |
-| Signatures | **Not in v0.1.** For a private single-operator system the threat is a malicious skill arriving via a registry, addressed by `trust: untrusted` + a human gate, not by PKI. Document this as a deliberate deferral, not an oversight. |
-| Install | Copy payload into `capabilities/`, write manifest, record digest. |
-| Updates | Replace payload; keep prior version for rollback. |
-| Rollback | Restore prior version by digest. |
-| Removal | Delete payload + manifest. **Owned external state is never deleted automatically.** |
+| Discovery | Filesystem scan of `capabilities/<kind>/<id>/module.json`. No remote registry in v0.1. **Implemented.** |
+| Validation | Schema check; `id` uniqueness; `runtime.entry` exists *and is executable*; `digest` matches payload. **Refuse on any failure — do not drop-and-continue.** **Implemented.** |
+| Dependency resolution | Topological order over `requires`; missing requirement = hard error, never a warning. Cycles are reported, never ordered arbitrarily. **Implemented.** |
+| Compatibility | `api_version` major must match. **Implemented.** |
+| Trust | Policy-assigned from `provenance`. Author-declared trust is **advisory only**, and may only ever be lowered. **Implemented.** |
+| Provenance | `digest` recorded on enable; re-verified on every scan. **Implemented.** |
+| Signatures | **Not in v0.1.** For a private single-operator system the threat is a malicious skill arriving via a registry, addressed by `trust: untrusted` + a human gate, not by PKI. Documented as a deliberate deferral, not an oversight. |
+| Install | Copy payload into `capabilities/`, write manifest, record digest. **Not implemented.** |
+| Updates | Replace payload; keep prior version for rollback. **Not implemented.** |
+| Rollback | Restore prior version by digest. **Not implemented.** |
+| Removal | Delete payload + manifest. **Owned external state is never deleted automatically.** **Not implemented.** |
 
-Security properties to hold: a manifest **cannot** grant itself permissions (§5.1 marks them `requested`); digest is checked at enable *and* at start, so a tampered payload is caught even while enabled; untrusted capabilities run sandboxed (§5.8).
+Security properties to hold: a manifest **cannot** grant itself permissions
+(§5.1 marks them `requested`, and the requested/granted step lives only in
+policy); digest is checked on every scan, so a tampered payload is caught even
+while enabled; untrusted capabilities run sandboxed (§5.8).
+
+**Why enable pins the digest.** A digest declared by the manifest detects
+accidents, not an attacker with write access — such an attacker simply rewrites
+the declared digest. Enabling therefore records the digest the operator
+approved, and a later mismatch revokes the approval instead of riding along on
+it. This is strictly stronger than the "recorded on enable" line above and is
+what the implementation actually does.
 
 ### 5.3 Workflow specification
 

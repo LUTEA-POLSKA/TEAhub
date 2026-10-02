@@ -36,6 +36,8 @@ pub enum ValidationError {
     MissingEntry { entry: String },
     #[error("native entry {entry} must be a bare file name inside the capability directory")]
     EntryEscapesDirectory { entry: String },
+    #[error("native entry {entry} exists but is not executable")]
+    EntryNotExecutable { entry: String },
     #[error("http runtime url {url:?} is not an http(s) URL")]
     BadUrl { url: String },
     #[error("stdio command {command:?} must be a bare file name")]
@@ -111,6 +113,9 @@ fn validate_runtime(m: &Manifest, root: &Path) -> Result<(), ValidationError> {
             if !root.join(entry).is_file() {
                 return Err(ValidationError::MissingEntry { entry: raw.into() });
             }
+            if !is_executable(&root.join(entry)) {
+                return Err(ValidationError::EntryNotExecutable { entry: raw.into() });
+            }
         }
         Runtime::Stdio { command, .. } => {
             if command.contains('/') || command.contains('\\') || command.contains(':') {
@@ -126,6 +131,27 @@ fn validate_runtime(m: &Manifest, root: &Path) -> Result<(), ValidationError> {
         }
     }
     Ok(())
+}
+
+/// A native entry has to be runnable, not merely present.
+///
+/// Unix carries the bit; Windows has no executable bit, so an extension is the
+/// closest honest signal. A non-executable entry that validates anyway would be
+/// a capability that fails only when a run is already under way.
+#[cfg(unix)]
+fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path)
+        .map(|m| m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("exe" | "bat" | "cmd" | "com")
+    )
 }
 
 fn validate_permissions(m: &Manifest) -> Result<(), ValidationError> {
@@ -191,6 +217,21 @@ mod tests {
         fs::write(root.join("reviewer.exe"), b"binary").expect("write entry");
         let _ = tag;
         (dir, root)
+    }
+
+    #[test]
+    fn an_entry_without_a_runnable_extension_is_refused() {
+        let (_d, root) = seeded("noexec");
+        fs::write(root.join("reviewer.exe"), b"binary").expect("rewrite");
+        let mut m = manifest();
+        m.runtime = crate::capability::manifest::Runtime::Native {
+            entry: "notes.txt".into(),
+        };
+        fs::write(root.join("notes.txt"), b"just text").expect("write");
+        assert!(
+            validate(&m, &root, None).is_ok() == false,
+            "a text file is not a native entry"
+        );
     }
 
     #[test]
