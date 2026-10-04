@@ -20,22 +20,37 @@ Versionierungsfragen.
 
 ```
 TEAhub/
-├── src/
-│   ├── app/                 Next.js App Router (UI + Route Handlers)
-│   │   └── (dashboard)/     Tasks, Agents, Approvals, Audit
-│   ├── server/              Server-only: DB, Policy, Agent, Tools
-│   │   ├── db/              Drizzle-Schema und Queries
-│   │   ├── auth/            Session, Rollen
-│   │   ├── policy/          allow / require_human / deny — fail-closed
-│   │   ├── agent/           Loop, Context, Cancellation
-│   │   ├── tools/           filesystem.read/write, web.fetch
-│   │   ├── ai/              Provider-Interface, Routing
-│   │   └── audit/           append-only Event-Schema
-│   └── lib/                 geteilte Typen, keine Logik
-├── worker/                  Ein Node-Prozess, holt queued Tasks
-├── packages/ui/             TEAui (installiert, nicht portiert)
+├── src/                      Rust-Referenzbestand. Eingefroren, wird nicht
+│   │                         weiter entwickelt (ADR-0002 §1). 4.716 LOC,
+│   │                         112 Tests — der Vertrag für den Port.
+│   └── …
+├── web/                      Next.js App Router (UI + Route Handlers)
+│   ├── app/
+│   │   └── (dashboard)/      Tasks, Agents, Approvals, Audit
+│   ├── server/               Server-only: DB, Policy, Agent, Tools
+│   │   ├── db/               Drizzle-Schema und Queries
+│   │   ├── auth/             Session, Rollen
+│   │   ├── policy/           allow / require_human / deny — fail-closed
+│   │   ├── agent/            Loop, Context, Cancellation
+│   │   ├── tools/            filesystem.read/write, web.fetch
+│   │   ├── ai/               Provider-Interface, Routing
+│   │   └── audit/            append-only Event-Schema
+│   └── lib/                  geteilte Typen, keine Logik
+├── worker/                   Ein Node-Prozess, holt queued Tasks
+├── packages/ui/              TEAui (installiert, nicht portiert)
 └── docs/
 ```
+
+**Warum `src/` nicht angefasst wird.** Der Rust-Bestand wird nicht verschoben,
+damit die Audit-Messung (4.716 LOC in `src/`) gültig bleibt und die
+Doc-Verweise nicht stale werden. Der Umzug ist eine spätere Entscheidung und
+leicht nachgeholt — ein `git mv` und eine Doku-Anpassung. Umgekehrt ist ein
+falsch platzierter Bestand im Repo schwer zu bemerken.
+
+**Konsequenz:** Zwei Toolchains im selben Repo. Rust wird **nicht** mehr gebaut
+und **nicht** mehr getestet, außer beim Portieren — seine Tests sind der
+Vertrag, kein laufender Build. Das ist der Preis von „nicht löschen, nicht
+weiterentwickeln" und er ist im Vorschlabewusst.
 
 ## 2. Datenmodell — 10 Tabellen, keine mehr
 

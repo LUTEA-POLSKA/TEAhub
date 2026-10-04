@@ -17,9 +17,14 @@ Policy-Hierarchie und Digest-Pinning korrekt arbeiten. Beim Portieren werden sie
 zum Vertrag: jedes TS-Modul bekommt den Port der reinen Logik, und die
 Rust-Tests definieren, was das Ergebnis sein muss.
 
-**Grenze.** `src/` bleibt der Rust-Bestand und ist kein gültiges Ziel mehr. Der
-TS-Code liegt in `src/` des neuen Aufbaus — die Trennung ist ein Migrationsschritt,
-kein Dauerzustand.
+**Grenze.** Rust wird **nicht verschoben.** Es bleibt in `src/`, der TypeScript-Code
+geht nach `web/` (Next.js) und `worker/`. Damit bleiben die Audit-Messung
+(4.716 LOC in `src/`) und alle Doc-Verweise gültig, und der Umzug bleibt eine
+spätere, leicht nachgeholte Entscheidung.
+
+**Was das kostet.** Zwei Toolchains in einem Repo. Rust wird nicht mehr gebaut
+und nicht mehr getestet, außer beim Portieren — seine Tests sind Vertrag, kein
+laufender Build. Der Preis ist im Architekturvorschlag festgehalten.
 
 **Auflösung der Löschfrage.** Rust wird entfernt, **wenn** für jedes portierte
 Modul ein TS-Test existiert, der denselben Fall abdeckt. Vorher nicht. Das ist
