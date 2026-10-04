@@ -80,7 +80,7 @@
 | **TEAui** | ja | React 19.2, TS 5.9, Radix, Tailwind, Vitest | 25.8k | **Ja — sofort installierbar, kein Portieren** |
 | **OCTEAFORK** | ja, Branch `dev` | Bun + Turbo + Effect-TS + drizzle/SQLite | ~523k | **Ja — `packages/llm/`, `CONSTRAINTS.md`** |
 | MLHSM-MODULES | ja | JSON-Registry + Schema + Validator | 312 | **Ja — Manifest-Isolationsvertrag** |
-| **StarNet** | ja, **0 Commits** | Node-Sidecar + Tauri | 470k | Teilweise — `permissions.js`, `permgrants.js`, `challengegate.js`, Budget-Block |
+| **StarNet** | ja, **0 Commits** | Node-Sidecar + Tauri | 470k | **REJECT als Baustein — nur Code-Inspiration** (Vom Owner festgelegt. Nichts portieren, nichts einbauen. `permissions.js`/`challengegate.js`/`budget.js` sind als *Muster* lesbar, nicht als Komponenten übernehmbar.) |
 | LUTEADESIGNDASHBOARD | ja, **86 uncommittet** | Next 15.5, React 19, better-sqlite3, zod | 8.2k | Teilweise — `overseer/{control,gate}`, Auth/RBAC |
 | TEAflow | ja, lokal | Rust (Gecko) + TS, MCP-Server | 8.5k | Teilweise — `packages/policy`, `packages/mcp` |
 | OC-TEA | ja | unveränderter OpenCode-Fork | 664k | **Nein — null TEA-Spezifika** |
@@ -130,7 +130,15 @@ Worker-Deployments, Cron-Schedules.
 | Manifest-Isolationsvertrag | MLHSM-MODULES | **direkt übernehmen** |
 | `openai-compatible.ts` = 900 Bytes | OCTEAFORK `packages/llm/` | **Muster übernehmen** |
 | Komponentenbibliothek | TEAui | **installieren, nicht portieren** |
-| Consent-Broker mit E-STOP | StarNet | Muster für Human Gate |
+| Consent-Broker mit E-STOP | StarNet | **nur Inspiration, kein Import** |
+
+## Vom Owner festgelegt
+
+- **StarNet ist ausschließlich Code-Inspiration.** Kein Baustein, kein Import,
+  keine Portierung. Wertvoll sind die *Muster*, nicht die Dateien.
+- **TEAhub ist am Ende browserbasiert.** Die UI ist eine Web-Anwendung. Das
+  Backend bleibt Server-seitig, weil Secrets, Policy-Entscheidungen und die
+  Datenbank nicht in den Browser gehören (§36, §38).
 
 ## Offen und nicht verifiziert
 
