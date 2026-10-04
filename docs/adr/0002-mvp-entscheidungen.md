@@ -79,3 +79,57 @@ Key. ModelMesh hinzufügen ist eine Zeile in `.env`.
   möglich, aber der MVP hat nichts zu isolieren
 - **Signaturen für die Tool-Registry** (Ed25519) — §45 nennt sie, §46 hält
   Digest plus Human Gate für den realen lokalen Bedrohungsschirm
+
+---
+
+# ADR-0003 — Erster Meilenstein und Umsetzungstiefe
+
+**Datum:** 2026-10-02 · **Status:** angenommen · **Beschlossen vom Owner**
+
+## 1 — Erster Meilenstein ist ein vertikaler Schnitt
+
+**Entschieden:** Der erste Meilenstein reicht von Schema bis Tool-Call.
+Schema, Auth, Policy und Agent-Runtime in einer dünnen Scheibe, dann Tasks,
+Gates, Oberfläche.
+
+**Begründung.** Er beweist, dass die ganze Kette trägt, und dass die
+Rust-Tests als Vertrag funktionieren — beides, bevor irgendein Framework
+läuft. Ein Schema-plus-Auth-Commit wäre schneller, lässt aber die
+Schnittstelle zwischen Policy und Agent unberührt.
+
+## 2 — Portierung bedarfsgesteuert
+
+**Entschieden:** Portiert wird nur, was die neue Architektur braucht.
+Policy-Hierarchie, Digest-Pinning, Trust-Tiers.
+
+**Begründung.** Die HTTP-Schale wird **nicht** portiert — TypeScript hat
+Next.js Route Handler. Der MLHSM-Client wird **nicht** portiert — die
+Multi-Provider-Entscheidung ersetzt ihn durch den config-gesteuerten
+Layer. Ein vollständiger Vorab-Port würde Wochen in Code stecken, den die
+Zielarchitektur teilweise gar nicht verwendet.
+
+**Folge.** Der Rust-Bestand bleibt länger als Parallelstand im Repo sichtbar.
+Das ist der akzeptierte Preis und der Grund für die Lösch-Checkliste in
+§1 — jedes Modul verschwindet mit seinem Port, nicht gebündelt am Ende.
+
+## 3 — Zwei Rollen
+
+**Entschieden:** `admin` und `user`. Jede kritische Aktion wird serverseitig
+geprüft (§37).
+
+**Begründung.** §37 verlangt serverseitige Autorisierung, nicht ein
+mehrstufiges Rechtesystem. Regeln pro Tool und pro Verzeichnis werden erst
+sinnvoll, wenn mehrere Menschen mit verschiedenen Rechten arbeiten — das ist
+eine Frage des Betriebs, nicht des MVP.
+
+## 4 — Oberfläche entsteht früh als Skelett
+
+**Entschieden:** Layout, Navigation und LEER-Zustände mit TEAui entstehen
+parallel zum Backend, nicht danach.
+
+**Begründung.** TEAui ist installierbar, die Komponenten stehen also sofort
+bereit. Ein Skelett deckt früh auf, ob die Seitenstruktur trägt, und teilt
+die Arbeit zwischen der Tool-Chain und der UI-Kette.
+
+**Grenze.** Nur Struktur und LEER-Zustände. Keine Funktionalität vor dem
+vertikalen Schnitt.

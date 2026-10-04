@@ -1,5 +1,13 @@
 /target
 
+# TypeScript / pnpm / Next.js
+node_modules/
+.pnpm-store/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
 # Secrets. Provider-Keys come from the environment, never from a tracked file.
 .env
 .env.*
