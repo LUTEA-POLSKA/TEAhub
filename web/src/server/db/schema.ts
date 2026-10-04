@@ -42,11 +42,17 @@ export const outcome = pgEnum('outcome', [
 
 export const userRole = pgEnum('user_role', ['admin', 'user']);
 
+/**
+ * Provenance of an agent, named after the Rust contract in src/policy.rs rather
+ * than after a flattering adjective. `standard` and `trusted` say how good
+ * something is; `builtin`, `local` and `third_party` say where it came from,
+ * which is the question the policy engine actually asks.
+ */
 export const agentTier = pgEnum('agent_tier', [
+  'builtin',
+  'local',
+  'third_party',
   'untrusted',
-  'standard',
-  'trusted',
-  'core',
 ]);
 
 export const users = pgTable(
@@ -93,7 +99,7 @@ export const agents = pgTable('agents', {
   systemPromptVersion: text('system_prompt_version').notNull(),
   systemPrompt: text('system_prompt').notNull(),
 
-  tier: agentTier('tier').notNull().default('untrusted'),
+  tier: agentTier('tier').notNull().default('third_party'),
   enabled: boolean('enabled').notNull().default(false),
 
   /**

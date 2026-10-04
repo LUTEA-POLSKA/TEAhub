@@ -1,5 +1,5 @@
 {
-  "id": "161aacd7-dee4-424d-a555-19c3b2a6c000",
+  "id": "ce1de7c4-f8e0-4d09-bdaa-dc0ba874425b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -129,7 +129,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'untrusted'"
+          "default": "'third_party'"
         },
         "enabled": {
           "name": "enabled",
@@ -872,10 +872,10 @@
       "name": "agent_tier",
       "schema": "public",
       "values": [
-        "untrusted",
-        "standard",
-        "trusted",
-        "core"
+        "builtin",
+        "local",
+        "third_party",
+        "untrusted"
       ]
     },
     "public.outcome": {

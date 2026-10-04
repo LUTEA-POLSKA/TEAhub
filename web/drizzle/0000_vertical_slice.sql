@@ -1,4 +1,4 @@
-CREATE TYPE "public"."agent_tier" AS ENUM('untrusted', 'standard', 'trusted', 'core');--> statement-breakpoint
+CREATE TYPE "public"."agent_tier" AS ENUM('builtin', 'local', 'third_party', 'untrusted');--> statement-breakpoint
 CREATE TYPE "public"."outcome" AS ENUM('allowed', 'blocked', 'required_human', 'error');--> statement-breakpoint
 CREATE TYPE "public"."step_kind" AS ENUM('model_call', 'tool_call', 'gate');--> statement-breakpoint
 CREATE TYPE "public"."step_state" AS ENUM('running', 'completed', 'failed');--> statement-breakpoint
@@ -19,7 +19,7 @@ CREATE TABLE "agents" (
 	"description" text,
 	"system_prompt_version" text NOT NULL,
 	"system_prompt" text NOT NULL,
-	"tier" "agent_tier" DEFAULT 'untrusted' NOT NULL,
+	"tier" "agent_tier" DEFAULT 'third_party' NOT NULL,
 	"enabled" boolean DEFAULT false NOT NULL,
 	"trust_score" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

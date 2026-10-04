@@ -212,7 +212,7 @@ describe('schema: gates are their own query', () => {
 });
 
 describe('schema: trust and roles', () => {
-  it('defaults a new agent to untrusted and disabled', async () => {
+  it('defaults a new agent to third_party and disabled', async () => {
     const [agent] = await db
       .insert(schema.agents)
       .values({
@@ -222,7 +222,10 @@ describe('schema: trust and roles', () => {
       })
       .returning();
 
-    expect(agent!.tier).toBe('untrusted');
+    // third_party, not untrusted: an agent that declares nothing is third-party
+    // code until the operator says otherwise. The policy's default_tier is what
+    // decides, not the schema default.
+    expect(agent!.tier).toBe('third_party');
     expect(agent!.enabled).toBe(false);
     expect(agent!.trustScore).toBe(0);
   });
