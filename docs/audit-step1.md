@@ -142,6 +142,69 @@ Was sich **überschneidet** — und daher portierbar ist:
 
 ---
 
+## 7a. Zweiter Audit-Durchgang — Testverteilung, Dokumentation, Nebenwirkungen
+
+### Testabdeckung pro Modul
+
+| Modul | Zeilen | Tests |
+|---|---|---|
+| `policy.rs` | 698 | 18 |
+| `registry/mod.rs` | 891 | 18 |
+| `capability/validate.rs` | 385 | 13 |
+| `model/openai.rs` | 538 | 13 |
+| `model/mesh.rs` | 538 | 11 |
+| `model/mlhsm.rs` | 442 | 10 |
+| `config.rs` | 325 | 8 |
+| `model/capability.rs` | 289 | 7 |
+| `capability/manifest.rs` | 432 | 7 |
+| `capability/digest.rs` | 133 | 6 |
+| `model/mod.rs` | 184 | 1 |
+| **`main.rs`** | **340** | **0** |
+| `lib.rs` | 36 | 0 (nur Modul-Deklarationen) |
+| `capability/mod.rs` | 6 | 0 (nur Re-Exports) |
+
+**Befund: die Logikmodule sind gut getestet (112 Tests), die HTTP-Schicht hat
+keinen einzigen.** `main.rs` ist mit 340 Zeilen und 9 Endpoints die
+Sicherheitsgrenze — und genau dort ist die Testabdeckung null. Das ist die
+falsche Verteilung: Bei 112 grünen Tests liest es sich besser, als es ist.
+
+### Nebenwirkungen im Produktivpfad
+
+Alle `fs::write` / `create_dir_all` / `remove_` / `rename` liegen in
+Test-Helpern. Im Produktivpfad schreibt genau eine Stelle: `state.json` über
+`Registry::save_state`. **Keine versteckten Dateiseiteneffekte, kein globales
+Mutable-State, keine Initialisierungs-Reihenfolge-Falle.**
+
+### Dokumentation
+
+| Dokument | Zeilen | Zustand |
+|---|---|---|
+| `AUDIT.md` | 554 | **Überholt.** Beschreibt die vorige Architektur (MLHSM-Modul-Frage, SQLite, Capability-Zentrum). Steht im Repo-Root und wird jeden Leser in die falsche Richtung führen. |
+| `docs/audit-step1.md` | 242 | aktuell |
+| `docs/adr/0001-stack-typescript.md` | 118 | aktuell |
+| **`README.md`** | — | **Fehlt vollständig** |
+
+§43 fordert `clone → install → configure → dev`. Ohne README existiert dieser
+Pfad nicht — weder dokumentiert noch ausführbar.
+
+### Nicht verifizierbar in dieser Umgebung
+
+Ehrliche Lücken dieses Audits:
+
+- **`cargo audit` ist nicht installiert.** Die 137 transitiven Crates sind
+  **nicht** auf bekannte Schwachstellen geprüft. Das ist die wichtigste offene
+  Lücke und sie ist mit Bordmitteln nicht zu schließen.
+- **`Cargo.lock` enthält keine Lizenzfelder.** Die Lizenzkonformität ist aus
+  dem Lockfile heraus nicht prüfbar; sie müsste crateweise über crates.io
+  erhoben werden. Die crates.io-API drosselte die Abfrage.
+- **Versionsfrische der direkten Dependencies** nicht vollständig erhoben, aus
+  demselben Grund.
+
+Diese drei Punkte gehören vor dem ersten Commit einer neuen Dependency
+beantwortet, nicht danach.
+
+---
+
 ## 8. Empfehlung
 
 Nach §56: weniger Komplexität, weniger Dependencies, bessere Security, bessere Performance, bessere Wartbarkeit.
