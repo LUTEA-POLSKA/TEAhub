@@ -4,11 +4,13 @@ import {
   type FinishReason,
   type ModelClient,
   type ModelMessage,
+  type RecordedStep,
   type RunResult,
   type StepStore,
   type ToolSpec,
   type Usage,
   emptyUsage,
+  firstIncompleteStep,
 } from './types';
 
 export interface Budget {
@@ -79,9 +81,31 @@ export async function runAgent(
   const usage = emptyUsage();
   const messages: ModelMessage[] = [{ role: 'user', content: params.prompt }];
 
-  const stepIndex = await store.nextIndex(params.taskId);
+  // Record slots are allocated monotonically and carry no opinion about
+  // completeness. The *logical* step to resume at is derived from the records
+  // themselves — see `firstIncompleteStep`, and the comment there on why a fixed
+  // stride does not survive a step with more than one tool call.
+  let recordIndex = await store.nextIndex(params.taskId);
+  // Held in memory and appended to as the loop writes, so a resumed run looks up
+  // its own records by step rather than by a freshly allocated slot. Reading by
+  // slot would miss every existing memo and re-run the whole step.
+  const records = await store.readAll(params.taskId);
+  let step = firstIncompleteStep(records);
 
-  for (let step = stepIndex; step < budget.maxSteps; step++) {
+  const recordFor = (stepNo: number, kind: RecordedStep['kind']): RecordedStep | undefined =>
+    records.find((r) => r.stepNo === stepNo && r.kind === kind);
+
+  /**
+   * Write a record to the store and keep the in-memory copy in step, so the
+   * replay lookups above see what this run just wrote. Two sources of truth for
+   * "what has happened" is how a resume ends up re-running a tool.
+   */
+  const record = async (stepNo: number, value: RecordedStep): Promise<void> => {
+    await store.write(params.taskId, value);
+    records.push(value);
+  };
+
+  for (; step < budget.maxSteps; step++) {
     if (await store.isCancelRequested(params.taskId)) {
       return { status: 'cancelled', steps: step, usage };
     }
@@ -90,8 +114,8 @@ export async function runAgent(
     }
 
     // --- model call, memoised -------------------------------------------
-    const memoKey = step * 2;
-    const memo = await store.read(params.taskId, memoKey);
+    const memoKey = recordIndex++;
+    const memo = recordFor(step, 'model_call');
 
     let response;
     if (memo?.result) {
@@ -108,8 +132,9 @@ export async function runAgent(
       try {
         response = await model.generate({ system, messages, tools, signal: params.signal });
       } catch (error) {
-        await store.write(params.taskId, {
+        await record(step, {
           stepIndex: memoKey,
+          stepNo: step,
           kind: 'model_call',
           state: 'failed',
           error: (error as Error).message,
@@ -117,14 +142,18 @@ export async function runAgent(
         return { status: 'failed', error: (error as Error).message, steps: step, usage };
       }
 
-      await store.write(params.taskId, {
+      await record(step, {
         stepIndex: memoKey,
+        stepNo: step,
         kind: 'model_call',
         state: 'completed',
-        // toolCallCount is what makes the layout readable on resume: without it
-        // the store cannot tell a finished step from one whose third tool call
-        // never ran.
-        result: { ...(response as unknown as Record<string, unknown>), toolCallCount: response.toolCalls.length },
+        // toolCallCount is what lets a resumed run reconstruct the grouping. With
+        // it, a step that announced three tool calls is known to need three
+        // records, so a missing one cannot be mistaken for the end of the step.
+        result: {
+          ...(response as unknown as Record<string, unknown>),
+          toolCallCount: response.toolCalls.length,
+        },
       });
     }
 
@@ -159,8 +188,9 @@ export async function runAgent(
     // of the thirteen runtimes surveyed checks this; without it a cut-off
     // response keeps a task alive as though it had concluded.
     if (response.finishReason === 'length') {
-      await store.write(params.taskId, {
-        stepIndex: memoKey + 1,
+      await record(step, {
+        stepIndex: recordIndex++,
+        stepNo: step,
         kind: 'model_call',
         state: 'failed',
         error: 'finish_reason=length: the model ran out of output tokens mid-answer',
@@ -196,40 +226,50 @@ export async function runAgent(
     // The tool call is memoised as well as the model call. Without that, a run
     // interrupted after `filesystem.write` succeeded would replay the write on
     // resume — and a write is not idempotent.
-    for (const [callIndex, call] of response.toolCalls.entries()) {
+    for (const call of response.toolCalls) {
       if (await store.isCancelRequested(params.taskId)) {
         return { status: 'cancelled', steps: step, usage };
       }
 
-      // Each tool call gets its own index. A step with three calls occupies four,
-      // and sharing one index would make the second write a duplicate.
-      const toolKey = memoKey + 1 + callIndex;
-      const toolMemo = await store.read(params.taskId, toolKey);
+// Each tool call gets its own record slot. Allocated from the same counter
+      // as the model memo, so a step with three calls occupies four records and
+      // the next step's memo cannot collide with the third tool's index.
+      const toolKey = recordIndex++;
 
-      if (toolMemo && toolMemo.state !== 'completed') {
-        // The step's tool already ran and failed. Retrying it in place would need
-        // to overwrite a recorded step, which the unique index forbids — and that
-        // is the right constraint, not an obstacle. A tool may have applied part
-        // of its effect before failing, so re-running it is not guaranteed
-        // idempotent. A failed attempt is retried as a *new* attempt, never in
-        // place.
+      // Every tool record of this step, looked up by step rather than by the freshly
+      // allocated slot. A resumed run must see the records it already wrote.
+      const toolRecords = records.filter((r) => r.stepNo === step && r.kind === 'tool_call');
+
+      // Any tool record of this step that did not complete blocks a retry in
+      // place. Matched without requiring the call id: a `failed` record may not
+      // carry one, and requiring it would let precisely the case this guard
+      // exists for slip through.
+      const failedTool = toolRecords.find((r) => r.state !== 'completed');
+      if (failedTool) {
+        // Retrying in place would mean overwriting a recorded step, which the
+        // unique index forbids — and that is the right constraint, not an
+        // obstacle. A tool may have applied part of its effect before failing,
+        // so re-running it is not guaranteed idempotent. A failed attempt is
+        // retried as a *new* attempt, never in place.
         return {
           status: 'failed',
           error:
-            `step ${step}: ${call.name} already failed on an earlier attempt ` +
-            `(${toolMemo.error ?? 'no reason recorded'}); not retried in place`,
+            `step ${step}: a tool already failed on an earlier attempt ` +
+            `(${failedTool.error ?? 'no reason recorded'}); not retried in place`,
           steps: step,
           usage,
         };
       }
 
-      if (toolMemo?.result && toolMemo.result.toolCallId === call.id) {
+      const toolMemo = toolRecords.find((r) => r.result?.toolCallId === call.id);
+
+      if (toolMemo?.state === 'completed') {
         // Already executed on an earlier attempt. Replayed, not re-run.
         messages.push({
           role: 'tool',
           toolCallId: call.id,
           toolName: call.name,
-          content: String(toolMemo.result.content ?? ''),
+          content: String(toolMemo.result?.content ?? ''),
         });
         await audit.record({
           actorType: 'system',
@@ -255,8 +295,9 @@ export async function runAgent(
         // `ToolRunner` returns values and never throws, so a throw here is a
         // defect in the wiring — and we cannot tell whether the tool already ran.
         // Fail closed and record it rather than continuing on an unknown state.
-        await store.write(params.taskId, {
+        await record(step, {
           stepIndex: toolKey,
+          stepNo: step,
           kind: 'tool_call',
           state: 'failed',
           error: `tool entry point threw: ${(error as Error).message}`,
@@ -294,8 +335,9 @@ export async function runAgent(
         // The run stops here. The gate occupies its own index, separate from the
         // model memo, so resuming cannot re-run the model call that led to it.
         const gateKey = toolKey;
-        await store.write(params.taskId, {
+        await record(step, {
           stepIndex: gateKey,
+          stepNo: step,
           kind: 'gate',
           state: 'running',
           result: {
@@ -330,8 +372,9 @@ export async function runAgent(
         content,
       });
 
-      await store.write(params.taskId, {
+      await record(step, {
         stepIndex: toolKey,
+        stepNo: step,
         kind: 'tool_call',
         state: 'completed',
         result: { toolCallId: call.id, toolName: call.name, content },

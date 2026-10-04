@@ -1,5 +1,5 @@
 {
-  "id": "ce1de7c4-f8e0-4d09-bdaa-dc0ba874425b",
+  "id": "40976471-e3b4-400f-8d2b-2c020a93cbb5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -537,6 +537,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "step_no": {
+          "name": "step_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "step_index": {
           "name": "step_index",
           "type": "integer",
@@ -611,6 +618,27 @@
           "columns": [
             {
               "expression": "task_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_steps_task_step_idx": {
+          "name": "task_steps_task_step_idx",
+          "columns": [
+            {
+              "expression": "task_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "step_no",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -63,6 +63,7 @@ CREATE TABLE "sessions" (
 CREATE TABLE "task_steps" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"task_id" uuid NOT NULL,
+	"step_no" integer DEFAULT 0 NOT NULL,
 	"step_index" integer NOT NULL,
 	"kind" "step_kind" NOT NULL,
 	"state" "step_state" DEFAULT 'running' NOT NULL,
@@ -114,6 +115,7 @@ CREATE INDEX "audit_events_actor_idx" ON "audit_events" USING btree ("actor_type
 CREATE INDEX "sessions_user_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "task_steps_task_index_idx" ON "task_steps" USING btree ("task_id","step_index");--> statement-breakpoint
 CREATE INDEX "task_steps_task_idx" ON "task_steps" USING btree ("task_id");--> statement-breakpoint
+CREATE INDEX "task_steps_task_step_idx" ON "task_steps" USING btree ("task_id","step_no");--> statement-breakpoint
 CREATE INDEX "tasks_status_idx" ON "tasks" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "tasks_requested_by_idx" ON "tasks" USING btree ("requested_by");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_idx" ON "users" USING btree (lower("email"));

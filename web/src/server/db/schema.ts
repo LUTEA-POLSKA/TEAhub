@@ -193,6 +193,14 @@ export const taskSteps = pgTable(
     taskId: uuid('task_id')
       .notNull()
       .references(() => tasks.id, { onDelete: 'cascade' }),
+    /**
+     * The logical step, distinct from `step_index`.
+     *
+     * A step is variable-length — one with three tool calls occupies four
+     * records — so the resume decision cannot be derived from a fixed stride.
+     * `step_no` carries the grouping, `step_index` the order.
+     */
+    stepNo: integer('step_no').notNull().default(0),
     stepIndex: integer('step_index').notNull(),
     kind: stepKind('kind').notNull(),
     state: stepState('state').notNull().default('running'),
@@ -214,6 +222,7 @@ export const taskSteps = pgTable(
      */
     uniqueIndex('task_steps_task_index_idx').on(t.taskId, t.stepIndex),
     index('task_steps_task_idx').on(t.taskId),
+    index('task_steps_task_step_idx').on(t.taskId, t.stepNo),
   ],
 );
 

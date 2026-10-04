@@ -6,6 +6,7 @@ import {
   type RecordedStep,
   type RunResult,
   type StepStore,
+  firstIncompleteStep,
 } from './types';
 import type { AuditSink } from '../tools/runner';
 import { createReadTool, createWriteTool } from '../tools/filesystem';
@@ -20,8 +21,11 @@ class MemStore implements StepStore {
   /** Counts writes that would have violated the unique index. */
   writeAttempts = 0;
 
-  async read(taskId: string, stepIndex: number) {
+async read(taskId: string, stepIndex: number) {
     return this.steps.get(stepIndex);
+  }
+  async readAll(_taskId: string) {
+    return [...this.steps.values()].sort((a, b) => a.stepIndex - b.stepIndex);
   }
   async write(taskId: string, step: RecordedStep) {
     this.writeAttempts += 1;
@@ -31,25 +35,12 @@ class MemStore implements StepStore {
     this.steps.set(step.stepIndex, step);
   }
 async nextIndex(_taskId: string) {
-    // Step `n` starts at 2n. Its model memo declares how many tool calls
-    // followed, occupying 2n+1 … 2n+count. A step is complete only when the memo
-    // and every tool record are `completed` — a failed record means the step is
-    // unfinished, which is what sends a resumed run back to it.
-    for (let step = 0; ; step += 1) {
-      const memo = this.steps.get(step * 2);
-      if (!memo || memo.state !== 'completed') return step;
-
-      const count = Number(memo.result?.toolCallCount ?? 0);
-      let complete = true;
-      for (let i = 1; i <= count; i += 1) {
-        const rec = this.steps.get(step * 2 + i);
-        if (!rec || rec.state !== 'completed') {
-          complete = false;
-          break;
-        }
-      }
-      if (!complete) return step;
-    }
+    // A plain allocation: one past the highest recorded slot. The resume decision
+    // lives in `firstIncompleteStep`, not here — this store must not have an
+    // opinion about completeness.
+    let max = -1;
+    for (const key of this.steps.keys()) max = Math.max(max, key);
+    return max + 1;
   }
   async isCancelRequested() {
     return this.cancel;
@@ -258,6 +249,7 @@ it('replays a recorded model call instead of paying for it twice', async () => {
     // record a failure — and a failed step is deliberately not retried in place.
     const recorded = call('filesystem.read', { path: 'x' });
     await store.write('t1', {
+      stepNo: 0,
       stepIndex: 0,
       kind: 'model_call',
       state: 'completed',
@@ -302,12 +294,14 @@ it('replays a recorded model call instead of paying for it twice', async () => {
 
     const recorded = call('filesystem.write', { path: 'a.txt', content: 'x' });
     await store.write('t1', {
+      stepNo: 0,
       stepIndex: 0,
       kind: 'model_call',
       state: 'completed',
       result: { ...(recorded as unknown as Record<string, unknown>), toolCallCount: 1 },
     });
     await store.write('t1', {
+      stepNo: 0,
       stepIndex: 1,
       kind: 'tool_call',
       state: 'failed',
@@ -373,16 +367,23 @@ it('replays a recorded model call instead of paying for it twice', async () => {
   it('resumes at the unfinished step rather than one past it', async () => {
     const store = new MemStore();
     // Record only a model call at index 2 — step 1's model, no tool result.
-    await store.write('t1', { stepIndex: 2, kind: 'model_call', state: 'completed', result: {} });
+await store.write('t1', {
+      stepNo: 1,
+      stepIndex: 2,
+      kind: 'model_call',
+      state: 'completed',
+      result: {},
+    });
 
     // Step 0 has neither index, so it is the first incomplete step.
-    expect(await store.nextIndex('t1')).toBe(0);
+    expect(firstIncompleteStep(await store.readAll('t1'))).toBe(0);
   });
 
 it('logs the replay so a resumed run is visible in the audit', async () => {
     const store = new MemStore();
     const recorded = call('filesystem.read', { path: 'x' });
     await store.write('t1', {
+      stepNo: 0,
       stepIndex: 0,
       kind: 'model_call',
       state: 'completed',
