@@ -18,7 +18,7 @@ export class PgAuditSink implements AuditSink {
     actorType: 'user' | 'agent' | 'system';
     actorId?: string;
     taskId?: string;
-    stepId?: string;
+    stepIndex?: number;
     action: string;
     target?: string;
     outcome: 'allowed' | 'blocked' | 'required_human' | 'error';
@@ -28,7 +28,7 @@ export class PgAuditSink implements AuditSink {
       actorType: entry.actorType,
       actorId: entry.actorId,
       taskId: entry.taskId ?? null,
-      stepId: entry.stepId ?? null,
+      stepIndex: entry.stepIndex ?? null,
       action: entry.action,
       target: entry.target ?? null,
       outcome: entry.outcome,

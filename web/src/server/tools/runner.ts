@@ -33,7 +33,7 @@ export interface AuditSink {
     actorType: 'user' | 'agent' | 'system';
     actorId?: string;
     taskId?: string;
-    stepId?: string;
+    stepIndex?: number;
     action: string;
     target?: string;
     outcome: 'allowed' | 'blocked' | 'required_human' | 'error';
@@ -68,10 +68,10 @@ export class ToolRunner {
     toolName: string;
     args: unknown;
     taskId?: string;
-    stepId?: string;
+    stepIndex?: number;
     signal?: AbortSignal;
   }): Promise<ToolOutcome> {
-    const { agent, toolName, args, taskId, stepId, signal } = params;
+    const { agent, toolName, args, taskId, stepIndex, signal } = params;
 
     const tool = this.tools.get(toolName);
     if (!tool) {
@@ -79,7 +79,7 @@ export class ToolRunner {
         actorType: 'agent',
         actorId: agent.id,
         taskId,
-        stepId,
+        stepIndex,
         action: `tool.call:${toolName}`,
         outcome: 'blocked',
         detail: { reason: 'no such tool' },
@@ -89,7 +89,7 @@ export class ToolRunner {
 
     // Cut 1: does this agent hold the tool at all.
     if (!agent.grantedTools.includes(toolName)) {
-      await this.block(agent, toolName, 'not granted to this agent', taskId, stepId);
+      await this.block(agent, toolName, 'not granted to this agent', taskId, stepIndex);
       return {
         kind: 'blocked',
         permission: { kind: 'fs.read', resource: toolName },
@@ -108,7 +108,7 @@ export class ToolRunner {
         actorType: 'agent',
         actorId: agent.id,
         taskId,
-        stepId,
+        stepIndex,
         action: `tool.call:${toolName}`,
         outcome: 'error',
         detail: { reason: 'invalid arguments', message: (error as Error).message },
@@ -132,7 +132,7 @@ export class ToolRunner {
     const verdict: Verdict = judgement?.verdict ?? 'deny';
 
     if (verdict === 'deny') {
-      await this.block(agent, toolName, judgement?.reason ?? 'denied', taskId, stepId, permission);
+      await this.block(agent, toolName, judgement?.reason ?? 'denied', taskId, stepIndex, permission);
       return {
         kind: 'blocked',
         permission,
@@ -146,7 +146,7 @@ export class ToolRunner {
         actorType: 'agent',
         actorId: agent.id,
         taskId,
-        stepId,
+        stepIndex,
         action: `tool.call:${toolName}`,
         target: `${permission.kind}:${permission.resource ?? ''}`,
         outcome: 'required_human',
@@ -165,7 +165,7 @@ export class ToolRunner {
     if (constraint) {
       const violated = checkConstraints(typed, constraint);
       if (violated !== null) {
-        await this.block(agent, toolName, violated, taskId, stepId, permission);
+        await this.block(agent, toolName, violated, taskId, stepIndex, permission);
         return { kind: 'blocked', permission, rule: 'agent constraint', reason: violated };
       }
     }
@@ -176,7 +176,7 @@ export class ToolRunner {
       actorType: 'agent',
       actorId: agent.id,
       taskId,
-      stepId,
+      stepIndex,
       action: `tool.call:${toolName}`,
       target: `${permission.kind}:${permission.resource ?? ''}`,
       outcome: output.ok ? 'allowed' : 'error',
@@ -200,14 +200,14 @@ export class ToolRunner {
     toolName: string,
     reason: string,
     taskId?: string,
-    stepId?: string,
+    stepIndex?: number,
     permission?: RequestedPermission,
   ): Promise<void> {
     await this.deps.audit.record({
       actorType: 'agent',
       actorId: agent.id,
       taskId,
-      stepId,
+      stepIndex,
       action: `tool.call:${toolName}`,
       target: permission ? `${permission.kind}:${permission.resource ?? ''}` : undefined,
       outcome: 'blocked',

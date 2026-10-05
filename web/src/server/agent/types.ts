@@ -131,7 +131,7 @@ export type RunResult =
   | { status: 'completed'; text: string; steps: number; usage: Usage }
   | {
       status: 'waiting_approval';
-      stepId: string;
+      stepIndex: number;
       permission: RequestedPermission;
       rule: string;
       reason: string;

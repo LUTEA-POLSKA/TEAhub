@@ -278,7 +278,7 @@ describe('schema: audit is append-only by shape', () => {
       'detail',
       'id',
       'outcome',
-      'stepId',
+      'stepIndex',
       'target',
       'taskId',
     ]);

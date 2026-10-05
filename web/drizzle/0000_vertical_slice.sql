@@ -45,7 +45,7 @@ CREATE TABLE "audit_events" (
 	"actor_type" text NOT NULL,
 	"actor_id" text,
 	"task_id" uuid,
-	"step_id" uuid,
+	"step_index" integer,
 	"agent_id" uuid,
 	"action" text NOT NULL,
 	"target" text,

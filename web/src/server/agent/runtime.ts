@@ -38,7 +38,7 @@ export interface AgentRuntimeDeps {
     toolName: string;
     args: unknown;
     taskId: string;
-    stepId: string;
+    stepIndex: number;
     signal?: AbortSignal;
   }) => Promise<
     | { kind: 'executed'; output: { ok: boolean; data?: unknown; error?: string } }
@@ -132,6 +132,15 @@ export async function runAgent(
       try {
         response = await model.generate({ system, messages, tools, signal: params.signal });
       } catch (error) {
+        // "The model failed" and "the model layer could not be reached" are
+        // different events. Swallowing both turns a provider outage into a task
+        // failure, which is how a network problem gets reported as a broken
+        // agent. The marker is a structural check rather than an import, so the
+        // loop stays free of any provider knowledge.
+        if ((error as { isProviderUnavailable?: boolean }).isProviderUnavailable === true) {
+          throw error;
+        }
+
         await record(step, {
           stepIndex: memoKey,
           stepNo: step,
@@ -288,7 +297,7 @@ export async function runAgent(
           toolName: call.name,
           args: call.args,
           taskId: params.taskId,
-          stepId: `${memoKey}`,
+          stepIndex: memoKey,
           signal: params.signal,
         });
       } catch (error) {
@@ -352,7 +361,7 @@ export async function runAgent(
         await store.markWaitingApproval(params.taskId, `${gateKey}`);
         return {
           status: 'waiting_approval',
-          stepId: `${gateKey}`,
+          stepIndex: gateKey,
           permission: outcome.permission,
           rule: outcome.rule,
           reason: outcome.reason,

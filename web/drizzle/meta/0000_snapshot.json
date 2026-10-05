@@ -1,5 +1,5 @@
 {
-  "id": "40976471-e3b4-400f-8d2b-2c020a93cbb5",
+  "id": "a3cd9380-b736-4d0d-9b1c-6577add34c84",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -353,9 +353,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "step_id": {
-          "name": "step_id",
-          "type": "uuid",
+        "step_index": {
+          "name": "step_index",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

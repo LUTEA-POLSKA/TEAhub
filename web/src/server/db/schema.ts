@@ -276,7 +276,15 @@ export const auditEvents = pgTable(
     actorId: text('actor_id'),
 
     taskId: uuid('task_id'),
-    stepId: uuid('step_id'),
+    /**
+     * The record index within the task, not a foreign key to `task_steps.id`.
+     *
+     * The loop knows an index; the row has a uuid. Conflating the two meant a
+     * string index was written into a uuid column and every audit insert for a
+     * tool call failed. The audit log records *what happened*, and an index
+     * survives the row it points at.
+     */
+    stepIndex: integer('step_index'),
     agentId: uuid('agent_id'),
 
     action: text('action').notNull(),
