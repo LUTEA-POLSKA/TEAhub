@@ -1,5 +1,5 @@
 {
-  "id": "a3cd9380-b736-4d0d-9b1c-6577add34c84",
+  "id": "5789a701-31fd-480c-a525-b3ff700146be",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -861,6 +861,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'user'"
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

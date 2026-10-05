@@ -62,6 +62,12 @@ export const users = pgTable(
     email: text('email').notNull(),
     name: text('name').notNull(),
     role: userRole('role').notNull().default('user'),
+    /**
+     * scrypt, never reversible. Null on a user created through seeding, which
+     * means such a user cannot log in with a password until one is set — a
+     * deliberate failure over a usable default.
+     */
+    passwordHash: text('password_hash'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -95,6 +95,7 @@ CREATE TABLE "users" (
 	"email" text NOT NULL,
 	"name" text NOT NULL,
 	"role" "user_role" DEFAULT 'user' NOT NULL,
+	"password_hash" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
