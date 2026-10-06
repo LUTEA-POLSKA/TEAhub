@@ -16,6 +16,10 @@ next-env.d.ts
 *.key
 secrets/
 
+# Nested reference repo (Automaton) — vendored as research material, tracked
+# in its own repository, not inlined into TEAhub.
+/automaton
+
 # Local registry state: which capabilities this machine approved and the digest
 # each was pinned to. Machine-specific, never shared — the pin is what makes an
 # approved payload tamper-evident, so it must not be inherited from another box.
